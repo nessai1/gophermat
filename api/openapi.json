@@ -1,0 +1,146 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Gophermat",
+    "description": "сервис для расчета стоимости заказов через систему лояльности",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "paths": {
+    "/api/user/register": {
+      "post": {
+        "tags": ["Аутентификация"],
+        "description": "аутентификация пользователя",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/authData"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "пользователь успешно зарегистрирован и аутентифицирован"
+          },
+          "400": {
+            "description": "неверный формат запроса"
+          },
+          "409": {
+            "description": "логин уже занят"
+          },
+          "500": {
+            "description": "внутренняя ошибка сервера"
+          }
+        }
+      }
+    },
+    "/api/user/login": {
+      "post": {
+        "tags": ["Аутентификация"],
+        "description": "регистрация пользователя",
+        "parameters": [ ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/authData"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "пользователь успешно аутентифицирован"
+          },
+          "400": {
+            "description": "неверный формат запроса"
+          },
+          "401": {
+            "description": "неверная пара логин/пароль"
+          },
+          "500": {
+            "description": "внутренняя ошибка сервера"
+          }
+        }
+      }
+    },
+    "/api/user/orders": {
+      "post": {
+        "tags": ["Работа с заказами"],
+        "description": "загрузка пользователем номера заказа для расчёта",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": ["Работа с заказами"],
+        "description": "получение списка загруженных пользователем номеров заказов, статусов их обработки и информации о начислениях",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/user/balance": {
+      "get": {
+        "description": "получение текущего баланса счёта баллов лояльности пользователя",
+        "tags": ["Работа с балансом"],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/user/balance/withdraw": {
+      "post": {
+        "description": "запрос на списание баллов с накопительного счёта в счёт оплаты нового заказа",
+        "tags": ["Работа с балансом"],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/user/withdrawals": {
+      "get": {
+        "description": "получение информации о выводе средств с накопительного счёта пользователем",
+        "tags": ["Работа с балансом"],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+    }
+  },
+  "components": {
+    "schemas": {
+      "authData": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "login": "verovkin",
+          "password": "myStrongP@$$wd1337"
+        }
+      }
+    }
+  }
+}
