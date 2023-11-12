@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"github.com/joho/godotenv"
 	"os"
 	"sync"
 )
@@ -25,9 +26,13 @@ func GetConfig() *Config {
 }
 
 func fetchConfig() *Config {
+
 	serviceAddr := flag.String("a", "", "Address of service")
 	databaseConnection := flag.String("d", "", "Database connection uri")
 	accrualServiceAddr := flag.String("r", "", "Accrual service url")
+
+	flag.Parse()
+	godotenv.Load() // May not have .env
 
 	if serviceAddrEnv := os.Getenv("RUN_ADDRESS"); serviceAddrEnv != "" {
 		*serviceAddr = serviceAddrEnv
