@@ -1,0 +1,322 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Gophermat",
+    "description": "сервис для расчета стоимости заказов через систему лояльности",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "paths": {
+    "/api/user/register": {
+      "post": {
+        "tags": ["Аутентификация"],
+        "description": "аутентификация пользователя",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/authData"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "пользователь успешно зарегистрирован и аутентифицирован"
+          },
+          "400": {
+            "description": "неверный формат запроса"
+          },
+          "409": {
+            "description": "логин уже занят"
+          },
+          "500": {
+            "description": "внутренняя ошибка сервера"
+          }
+        }
+      }
+    },
+    "/api/user/login": {
+      "post": {
+        "tags": ["Аутентификация"],
+        "description": "регистрация пользователя",
+        "parameters": [ ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/authData"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "пользователь успешно аутентифицирован"
+          },
+          "400": {
+            "description": "неверный формат запроса"
+          },
+          "401": {
+            "description": "неверная пара логин/пароль"
+          },
+          "500": {
+            "description": "внутренняя ошибка сервера"
+          }
+        }
+      }
+    },
+    "/api/user/orders": {
+      "post": {
+        "tags": ["Работа с заказами"],
+        "description": "загрузка пользователем номера заказа для расчёта",
+        "requestBody": {
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string",
+                "example": "12345678903"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "номер заказа уже был загружен этим пользователем"
+          },
+          "202": {
+            "description": "новый номер заказа принят в обработку"
+          },
+          "400": {
+            "description": "неверный формат запроса"
+          },
+          "401": {
+            "description": "пользователь не аутентифицирован"
+          },
+          "409": {
+            "description": "номер заказа уже был загружен другим пользователем"
+          },
+          "422": {
+            "description": "неверный формат номера заказа"
+          },
+          "500": {
+            "description": "внутренняя ошибка сервера"
+          }
+        }
+      },
+      "get": {
+        "tags": ["Работа с заказами"],
+        "description": "получение списка загруженных пользователем номеров заказов, статусов их обработки и информации о начислениях",
+        "responses": {
+          "200": {
+            "description": "успешная обработка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": [
+                    {
+                      "number": "9278923470",
+                      "status": "PROCESSED",
+                      "accrual": 500,
+                      "uploaded_at": "2020-12-10T15:15:45+03:00"
+                    },
+                    {
+                      "number": "12345678903",
+                      "status": "PROCESSING",
+                      "uploaded_at": "2020-12-10T15:12:01+03:00"
+                    },
+                    {
+                      "number": "346436439",
+                      "status": "INVALID",
+                      "uploaded_at": "2020-12-09T16:09:53+03:00"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "нет данных для ответа"
+          },
+          "401": {
+            "description": "пользователь не авторизован"
+          },
+          "500": {
+            "description": "внутренняя ошибка сервера"
+          }
+        }
+      }
+    },
+    "/api/user/balance": {
+      "get": {
+        "description": "получение текущего баланса счёта баллов лояльности пользователя",
+        "tags": ["Работа с балансом"],
+        "responses": {
+          "200": {
+            "description": "успешная обработка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "current": {
+                      "type": "number"
+                    },
+                    "withdrawn": {
+                      "type": "number"
+                    }
+                  },
+                  "example": {
+                    "current": 500.5,
+                    "withdrawn": 42
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "пользователь не авторизован"
+          },
+          "500": {
+            "description": "внутренняя ошибка сервера"
+          }
+        }
+      }
+    },
+    "/api/user/balance/withdraw": {
+      "post": {
+        "description": "запрос на списание баллов с накопительного счёта в счёт оплаты нового заказа",
+        "tags": ["Работа с балансом"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order": {
+                    "type": "string"
+                  },
+                  "sum": {
+                    "type": "number"
+                  }
+                },
+                "example": {
+                  "order": "2377225624",
+                  "sum": 751
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/user/withdrawals": {
+      "get": {
+        "description": "получение информации о выводе средств с накопительного счёта пользователем",
+        "tags": ["Работа с балансом"],
+        "responses": {
+          "200": {
+            "description": "успешная обработка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "example": [
+                    {
+                      "order": "2377225624",
+                      "sum": 500,
+                      "processed_at": "2020-12-09T16:09:57+03:00"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "нет ни одного списания"
+          },
+          "401": {
+            "description": "пользователь не авторизован"
+          },
+          "500": {
+            "description": "внутренняя ошибка сервера"
+          }
+        }
+      }
+    },
+    "/api/orders/{number}": {
+      "get": {
+        "description": "получение информации о расчёте начислений баллов лояльности",
+        "tags": ["Взаимодействие с системой расчёта начислений баллов лояльности"],
+        "responses": {
+          "200": {
+            "description": "успешная обработка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "accrual": {
+                      "type": "number"
+                    }
+                  },
+                  "example": {
+                    "order": "<number>",
+                    "status": "PROCESSED",
+                    "accrual": 500
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "заказ не зарегистрирован в системе расчёта"
+          },
+          "429": {
+            "description": "превышено количество запросов к сервису",
+            "content": {
+              "text/plain": {
+                "example": "No more than N requests per minute allowed"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "authData": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "login": "verovkin",
+          "password": "myStrongP@$$wd1337"
+        }
+      }
+    }
+  }
+}
