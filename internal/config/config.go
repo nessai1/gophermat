@@ -7,11 +7,18 @@ import (
 	"sync"
 )
 
+type EnvType string
+
+const EnvTypeDevelopment EnvType = "development"
+const EnvTypeStage EnvType = "stage"
+const EnvTypeProduction EnvType = "production"
+
 type Config struct {
 	ServiceAddr        string
 	AccrualServiceAddr string
 	DBConnectionStr    string
 	SecretKey          string
+	EnvType            EnvType
 }
 
 var config *Config
@@ -46,10 +53,19 @@ func fetchConfig() *Config {
 		*accrualServiceAddr = accrualServiceAddrEnv
 	}
 
+	var envType EnvType
+	envTypeStr := os.Getenv("ENV_TYPE")
+	if envTypeStr == "" {
+		envType = EnvTypeProduction
+	} else {
+		envType = EnvType(envTypeStr)
+	}
+
 	return &Config{
 		ServiceAddr:        *serviceAddr,
 		AccrualServiceAddr: *accrualServiceAddr,
 		DBConnectionStr:    *databaseConnection,
 		SecretKey:          os.Getenv("ACCRUAL_SYSTEM_ADDRESS"),
+		EnvType:            envType,
 	}
 }

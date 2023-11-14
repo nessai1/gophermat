@@ -7,6 +7,6 @@ import (
 
 func main() {
 	if err := gophermart.Start(); err != nil {
-		log.Fatalf("Error while listening application: %w", err)
+		log.Fatalf("error while listening application: %s", err.Error())
 	}
 }
