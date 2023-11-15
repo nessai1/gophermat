@@ -2,6 +2,7 @@ package user
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -17,6 +18,16 @@ func (repository *TestRepository) GetUserByLogin(login string) (*User, error) {
 	}
 
 	return &user, nil
+}
+
+func (repository *TestRepository) CreateUser(user *User) error {
+	_, isFound := repository.data[user.Login]
+	if isFound {
+		return ErrLoginAlreadyExists
+	}
+
+	repository.data[user.Login] = *user
+	return nil
 }
 
 func TestController_GetUserByCredentials(t *testing.T) {
@@ -46,6 +57,36 @@ func TestController_GetUserByCredentials(t *testing.T) {
 	user, err = controller.GetUserByCredentials("userTwo", userOnePassword)
 	assert.ErrorIs(t, err, ErrUserNotFound, "method must be returned user not found error")
 	assert.Nil(t, user, "user pointer must be nil on incorrect login find")
+}
+
+func TestController_AddUser(t *testing.T) {
+	repository := TestRepository{data: map[string]User{}}
+	controller := NewController(&repository)
+
+	userLogin := "userOne"
+	userPassword := "passwordOne"
+
+	_, err := controller.GetUserByCredentials(userLogin, userPassword)
+	require.ErrorIs(t, err, ErrUserNotFound)
+
+	user, err := controller.AddUser(userLogin, userPassword)
+	require.NoError(t, err)
+	require.Equalf(t, len(repository.data), 1, "repository len must be 1, got %d", len(repository.data))
+
+	expectedUser := User{
+		Login:    userLogin,
+		Balance:  0,
+		password: buildPasswordHash(userPassword),
+	}
+
+	assert.Equal(t, expectedUser, *user, "created and expected users are not equal")
+
+	secondUser, err := controller.GetUserByCredentials(userLogin, userPassword)
+	require.NoError(t, err)
+	assert.Equal(t, *secondUser, *user)
+
+	_, err = controller.AddUser(userLogin, userPassword)
+	require.ErrorIs(t, err, ErrLoginAlreadyExists)
 }
 
 func Test_buildPasswordHash(t *testing.T) {

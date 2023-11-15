@@ -8,6 +8,7 @@ import (
 
 var ErrUserNotFound = errors.New("user not found")
 var ErrIncorrectUserPassword = errors.New("user password is wrong")
+var ErrLoginAlreadyExists = errors.New("input user login already exists")
 
 type User struct {
 	Login   string
@@ -18,6 +19,7 @@ type User struct {
 
 type Repository interface {
 	GetUserByLogin(string) (*User, error)
+	CreateUser(user *User) error
 }
 
 type Controller struct {
@@ -42,6 +44,26 @@ func (controller *Controller) GetUserByCredentials(login, password string) (*Use
 	}
 
 	return user, nil
+}
+
+func (controller *Controller) AddUser(login, password string) (*User, error) {
+	passwordHash := buildPasswordHash(password)
+
+	user := User{
+		Login:   login,
+		Balance: 0,
+
+		password: passwordHash,
+	}
+
+	err := controller.repository.CreateUser(&user)
+	if err != nil && !errors.Is(err, ErrLoginAlreadyExists) {
+		return nil, err
+	} else if err != nil {
+		return nil, fmt.Errorf("repository error while add user in controller: %w", err)
+	}
+
+	return &user, nil
 }
 
 func buildPasswordHash(password string) string {
