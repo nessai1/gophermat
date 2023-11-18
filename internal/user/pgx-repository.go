@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -13,6 +14,10 @@ type PGXRepository struct {
 }
 
 const PostgresErrCodeUniqueViolation = "23505"
+
+func CreatePGXRepository(db *sql.DB) *PGXRepository {
+	return &PGXRepository{db: db}
+}
 
 func (repository *PGXRepository) GetUserByLogin(ctx context.Context, login string) (*User, error) {
 	row := repository.db.QueryRowContext(ctx, "SELECT login, password, balance FROM user WHERE login = $1", login)

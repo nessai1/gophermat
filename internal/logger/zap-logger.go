@@ -3,9 +3,9 @@ package logger
 import (
 	"fmt"
 	"github.com/nessai1/gophermat/internal/config"
-	"go.uber.org/zap"
 	"os"
 
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 

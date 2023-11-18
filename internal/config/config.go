@@ -2,9 +2,10 @@ package config
 
 import (
 	"flag"
-	"github.com/joho/godotenv"
 	"os"
 	"sync"
+
+	"github.com/joho/godotenv"
 )
 
 type EnvType string

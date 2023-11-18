@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"github.com/nessai1/gophermat/internal/config"
 	"github.com/nessai1/gophermat/internal/database"
+	"github.com/nessai1/gophermat/internal/handler"
 	"github.com/nessai1/gophermat/internal/logger"
-	"go.uber.org/zap"
+	"github.com/nessai1/gophermat/internal/user"
 	"net/http"
 
 	"github.com/go-chi/chi"
+	"go.uber.org/zap"
 )
 
 func Start() error {
@@ -25,7 +27,15 @@ func Start() error {
 		return fmt.Errorf("cannot initialize database on start service: %w", err)
 	}
 
-	db.Ping()
+	authHandler := handler.AuthHandler{
+		Logger:         log,
+		UserController: user.NewController(user.CreatePGXRepository(db)),
+	}
+
+	router.Use(authHandler.MiddlewareAuthorizeRequest())
+
+	router.HandleFunc("/api/user/register", authHandler.HandleRegisterUser)
+	router.HandleFunc("/api/user/login", authHandler.HandleAuthUser)
 
 	log.Info("starting service", zap.String("service address", cfg.ServiceAddr))
 

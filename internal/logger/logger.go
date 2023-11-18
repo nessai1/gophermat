@@ -2,6 +2,7 @@ package logger
 
 import (
 	"github.com/nessai1/gophermat/internal/config"
+
 	"go.uber.org/zap"
 )
 

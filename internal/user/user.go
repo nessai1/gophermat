@@ -27,8 +27,8 @@ type Controller struct {
 	repository Repository
 }
 
-func NewController(repository Repository) Controller {
-	return Controller{repository: repository}
+func NewController(repository Repository) *Controller {
+	return &Controller{repository: repository}
 }
 
 func (controller *Controller) GetUserByCredentials(ctx context.Context, login, password string) (*User, error) {
