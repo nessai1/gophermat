@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -10,7 +11,7 @@ type TestRepository struct {
 	data map[string]User
 }
 
-func (repository *TestRepository) GetUserByLogin(login string) (*User, error) {
+func (repository *TestRepository) GetUserByLogin(_ context.Context, login string) (*User, error) {
 	user, isFind := repository.data[login]
 
 	if !isFind {
@@ -20,7 +21,7 @@ func (repository *TestRepository) GetUserByLogin(login string) (*User, error) {
 	return &user, nil
 }
 
-func (repository *TestRepository) CreateUser(user *User) error {
+func (repository *TestRepository) CreateUser(_ context.Context, user *User) error {
 	_, isFound := repository.data[user.Login]
 	if isFound {
 		return ErrLoginAlreadyExists
@@ -43,18 +44,19 @@ func TestController_GetUserByCredentials(t *testing.T) {
 	}
 
 	controller := NewController(&TestRepository{data: users})
+	ctx := context.TODO()
 
-	user, err := controller.GetUserByCredentials(userOneLogin, userOnePassword)
+	user, err := controller.GetUserByCredentials(ctx, userOneLogin, userOnePassword)
 	if assert.NoErrorf(t, err, "user with login %s must be found", userOneLogin) {
 		assert.Equalf(t, userOneLogin, user.Login, "user login not equeal (%s != %s)", userOneLogin, user.Login)
 		assert.Equalf(t, userOneBalance, user.Balance, "user balance not equeal (%f != %f)", userOneBalance, user.Balance)
 	}
 
-	user, err = controller.GetUserByCredentials(userOneLogin, "superSecrets")
+	user, err = controller.GetUserByCredentials(ctx, userOneLogin, "superSecrets")
 	assert.ErrorIs(t, err, ErrIncorrectUserPassword, "method must be returned incorrect password error")
 	assert.Nil(t, user, "user pointer must be nil on incorrect password find")
 
-	user, err = controller.GetUserByCredentials("userTwo", userOnePassword)
+	user, err = controller.GetUserByCredentials(ctx, "userTwo", userOnePassword)
 	assert.ErrorIs(t, err, ErrUserNotFound, "method must be returned user not found error")
 	assert.Nil(t, user, "user pointer must be nil on incorrect login find")
 }
@@ -66,10 +68,12 @@ func TestController_AddUser(t *testing.T) {
 	userLogin := "userOne"
 	userPassword := "passwordOne"
 
-	_, err := controller.GetUserByCredentials(userLogin, userPassword)
+	ctx := context.TODO()
+
+	_, err := controller.GetUserByCredentials(ctx, userLogin, userPassword)
 	require.ErrorIs(t, err, ErrUserNotFound)
 
-	user, err := controller.AddUser(userLogin, userPassword)
+	user, err := controller.AddUser(ctx, userLogin, userPassword)
 	require.NoError(t, err)
 	require.Equalf(t, len(repository.data), 1, "repository len must be 1, got %d", len(repository.data))
 
@@ -81,11 +85,11 @@ func TestController_AddUser(t *testing.T) {
 
 	assert.Equal(t, expectedUser, *user, "created and expected users are not equal")
 
-	secondUser, err := controller.GetUserByCredentials(userLogin, userPassword)
+	secondUser, err := controller.GetUserByCredentials(ctx, userLogin, userPassword)
 	require.NoError(t, err)
 	assert.Equal(t, *secondUser, *user)
 
-	_, err = controller.AddUser(userLogin, userPassword)
+	_, err = controller.AddUser(ctx, userLogin, userPassword)
 	require.ErrorIs(t, err, ErrLoginAlreadyExists)
 }
 

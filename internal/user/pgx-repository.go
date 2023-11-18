@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -11,8 +12,10 @@ type PGXRepository struct {
 	db *sql.DB
 }
 
-func (repository *PGXRepository) GetUserByLogin(login string) (*User, error) {
-	row := repository.db.QueryRow("SELECT login, password, balance FROM user WHERE login = $1", login)
+const PostgresErrCodeUniqueViolation = "23505"
+
+func (repository *PGXRepository) GetUserByLogin(ctx context.Context, login string) (*User, error) {
+	row := repository.db.QueryRowContext(ctx, "SELECT login, password, balance FROM user WHERE login = $1", login)
 
 	if row.Err() != nil && errors.Is(row.Err(), sql.ErrNoRows) {
 		return nil, ErrUserNotFound
@@ -30,13 +33,13 @@ func (repository *PGXRepository) GetUserByLogin(login string) (*User, error) {
 	return &user, nil
 }
 
-func (repository *PGXRepository) CreateUser(user *User) error {
-	_, err := repository.db.Exec("INSERT INTO user(login, password, balance) VALUES ($1, $2, $3)", user.Login, user.password, user.Balance)
+func (repository *PGXRepository) CreateUser(ctx context.Context, user *User) error {
+	_, err := repository.db.ExecContext(ctx, "INSERT INTO user(login, password, balance) VALUES ($1, $2, $3)", user.Login, user.password, user.Balance)
 
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
-			if pgErr.Code == "23505" {
+			if pgErr.Code == PostgresErrCodeUniqueViolation {
 				return ErrLoginAlreadyExists
 			}
 		}

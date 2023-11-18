@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -18,8 +19,8 @@ type User struct {
 }
 
 type Repository interface {
-	GetUserByLogin(string) (*User, error)
-	CreateUser(user *User) error
+	GetUserByLogin(context.Context, string) (*User, error)
+	CreateUser(context.Context, *User) error
 }
 
 type Controller struct {
@@ -30,8 +31,8 @@ func NewController(repository Repository) Controller {
 	return Controller{repository: repository}
 }
 
-func (controller *Controller) GetUserByCredentials(login, password string) (*User, error) {
-	user, err := controller.repository.GetUserByLogin(login)
+func (controller *Controller) GetUserByCredentials(ctx context.Context, login, password string) (*User, error) {
+	user, err := controller.repository.GetUserByLogin(ctx, login)
 
 	if err != nil && errors.Is(err, ErrUserNotFound) {
 		return nil, err
@@ -46,7 +47,7 @@ func (controller *Controller) GetUserByCredentials(login, password string) (*Use
 	return user, nil
 }
 
-func (controller *Controller) AddUser(login, password string) (*User, error) {
+func (controller *Controller) AddUser(ctx context.Context, login, password string) (*User, error) {
 	passwordHash := buildPasswordHash(password)
 
 	user := User{
@@ -56,7 +57,7 @@ func (controller *Controller) AddUser(login, password string) (*User, error) {
 		password: passwordHash,
 	}
 
-	err := controller.repository.CreateUser(&user)
+	err := controller.repository.CreateUser(ctx, &user)
 	if err != nil && !errors.Is(err, ErrLoginAlreadyExists) {
 		return nil, err
 	} else if err != nil {
