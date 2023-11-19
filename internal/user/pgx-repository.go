@@ -20,18 +20,18 @@ func CreatePGXRepository(db *sql.DB) *PGXRepository {
 }
 
 func (repository *PGXRepository) GetUserByLogin(ctx context.Context, login string) (*User, error) {
-	row := repository.db.QueryRowContext(ctx, "SELECT login, password, balance FROM user WHERE login = $1", login)
+	row := repository.db.QueryRowContext(ctx, "SELECT login, password, balance FROM \"user\" WHERE login = $1", login)
 
-	if row.Err() != nil && errors.Is(row.Err(), sql.ErrNoRows) {
-		return nil, ErrUserNotFound
-	} else if row.Err() != nil {
+	if row.Err() != nil {
 		return nil, fmt.Errorf("error while query for get user by login: %w", row.Err())
 	}
 
 	var user User
 
 	err := row.Scan(&user.Login, &user.password, &user.Balance)
-	if err != nil {
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrUserNotFound
+	} else if err != nil {
 		return nil, fmt.Errorf("error while scan row for get user by login: %w", err)
 	}
 
@@ -39,7 +39,7 @@ func (repository *PGXRepository) GetUserByLogin(ctx context.Context, login strin
 }
 
 func (repository *PGXRepository) CreateUser(ctx context.Context, user *User) error {
-	_, err := repository.db.ExecContext(ctx, "INSERT INTO user(login, password, balance) VALUES ($1, $2, $3)", user.Login, user.password, user.Balance)
+	_, err := repository.db.ExecContext(ctx, "INSERT INTO \"user\" (login, password, balance) VALUES ($1, $2, $3)", user.Login, user.password, user.Balance)
 
 	if err != nil {
 		var pgErr *pgconn.PgError

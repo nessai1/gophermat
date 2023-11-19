@@ -32,10 +32,18 @@ func Start() error {
 		UserController: user.NewController(user.CreatePGXRepository(db)),
 	}
 
-	router.Use(authHandler.MiddlewareAuthorizeRequest())
+	authMux := chi.NewMux()
+	authMux.HandleFunc("/api/user/register", authHandler.HandleRegisterUser)
+	authMux.HandleFunc("/api/user/login", authHandler.HandleAuthUser)
 
-	router.HandleFunc("/api/user/register", authHandler.HandleRegisterUser)
-	router.HandleFunc("/api/user/login", authHandler.HandleAuthUser)
+	orderHandler := handler.OrderHandler{}
+
+	orderMux := chi.NewMux()
+	orderMux.Use(authHandler.MiddlewareAuthorizeRequest())
+	orderMux.HandleFunc("/", orderHandler.HandleGetUserOrders)
+
+	router.Mount("/", authMux)
+	router.Mount("/api/user/orders", orderMux)
 
 	log.Info("starting service", zap.String("service address", cfg.ServiceAddr))
 
