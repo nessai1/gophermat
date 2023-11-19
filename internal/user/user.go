@@ -47,6 +47,11 @@ func (controller *Controller) GetUserByCredentials(ctx context.Context, login, p
 	return user, nil
 }
 
+func (controller *Controller) GetUserByLogin(ctx context.Context, login string) (*User, error) {
+	user, err := controller.repository.GetUserByLogin(ctx, login)
+	return user, err
+}
+
 func (controller *Controller) AddUser(ctx context.Context, login, password string) (*User, error) {
 	passwordHash := buildPasswordHash(password)
 

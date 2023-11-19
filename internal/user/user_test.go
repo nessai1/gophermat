@@ -8,30 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type TestRepository struct {
-	data map[string]User
-}
-
-func (repository *TestRepository) GetUserByLogin(_ context.Context, login string) (*User, error) {
-	user, isFind := repository.data[login]
-
-	if !isFind {
-		return nil, ErrUserNotFound
-	}
-
-	return &user, nil
-}
-
-func (repository *TestRepository) CreateUser(_ context.Context, user *User) error {
-	_, isFound := repository.data[user.Login]
-	if isFound {
-		return ErrLoginAlreadyExists
-	}
-
-	repository.data[user.Login] = *user
-	return nil
-}
-
 func TestController_GetUserByCredentials(t *testing.T) {
 	userOnePassword := "superSecret"
 	userOneLogin := "userOne"
@@ -44,7 +20,7 @@ func TestController_GetUserByCredentials(t *testing.T) {
 		},
 	}
 
-	controller := NewController(&TestRepository{data: users})
+	controller := NewController(&MapRepository{data: users})
 	ctx := context.TODO()
 
 	user, err := controller.GetUserByCredentials(ctx, userOneLogin, userOnePassword)
@@ -63,7 +39,7 @@ func TestController_GetUserByCredentials(t *testing.T) {
 }
 
 func TestController_AddUser(t *testing.T) {
-	repository := TestRepository{data: map[string]User{}}
+	repository := MapRepository{data: map[string]User{}}
 	controller := NewController(&repository)
 
 	userLogin := "userOne"
