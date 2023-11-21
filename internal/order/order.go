@@ -1,6 +1,11 @@
 package order
 
-import "strconv"
+import (
+	"errors"
+	"strconv"
+)
+
+var ErrInvalidOrderNumber = errors.New("invalid order number")
 
 func IsOrderNumberCorrect(orderNumber string) bool {
 	sum := 0

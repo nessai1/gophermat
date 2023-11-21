@@ -6,6 +6,7 @@ import (
 	"github.com/nessai1/gophermat/internal/database"
 	"github.com/nessai1/gophermat/internal/handler"
 	"github.com/nessai1/gophermat/internal/logger"
+	"github.com/nessai1/gophermat/internal/order"
 	"github.com/nessai1/gophermat/internal/user"
 	"net/http"
 
@@ -33,17 +34,30 @@ func Start() error {
 	}
 
 	authMux := chi.NewMux()
-	authMux.HandleFunc("/api/user/register", authHandler.HandleRegisterUser)
-	authMux.HandleFunc("/api/user/login", authHandler.HandleAuthUser)
+	authMux.Post("/api/user/register", authHandler.HandleRegisterUser)
+	authMux.Post("/api/user/login", authHandler.HandleAuthUser)
 
-	orderHandler := handler.OrderHandler{}
+	enrollmentController := handler.EnrollmentOrderHandler{
+		Logger:               log,
+		EnrollmentController: order.NewEnrollmentController(cfg.AccrualServiceAddr, order.CreatePGXEnrollmentRepository(db)),
+	}
+	enrollmentMux := chi.NewMux()
+	enrollmentMux.Use(authHandler.MiddlewareAuthorizeRequest())
+	enrollmentMux.Post("/", enrollmentController.HandleLoadOrders)
+	enrollmentMux.Get("/", enrollmentController.HandGetOrders)
 
-	orderMux := chi.NewMux()
-	orderMux.Use(authHandler.MiddlewareAuthorizeRequest())
-	orderMux.HandleFunc("/", orderHandler.HandleGetUserOrders)
+	balanceController := handler.BalanceHandler{
+		Logger: log,
+	}
+	balanceMux := chi.NewMux()
+	balanceMux.Use(authHandler.MiddlewareAuthorizeRequest())
+	balanceMux.Get("/", balanceController.HandleGetBalance)
+	balanceMux.Post("/withdraw", balanceController.HandleWithdraw)
 
 	router.Mount("/", authMux)
-	router.Mount("/api/user/orders", orderMux)
+	router.Mount("/api/user/orders", enrollmentMux)
+	router.Mount("/api/user/balance", balanceMux)
+	// TODO: add /api/user/withdrawals handle
 
 	log.Info("starting service", zap.String("service address", cfg.ServiceAddr))
 
