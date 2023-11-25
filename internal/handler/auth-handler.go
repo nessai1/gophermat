@@ -176,7 +176,7 @@ func (handler *AuthHandler) MiddlewareAuthorizeRequest() func(handler http.Handl
 				return
 			}
 
-			handler.Logger.Debug("user successful authorized", zap.String("user login", authUser.Login))
+			handler.Logger.Debug("user successful authorized", zap.Int("user id", authUser.ID))
 
 			request = request.WithContext(context.WithValue(ctx, AuthorizeUserContext, authUser))
 

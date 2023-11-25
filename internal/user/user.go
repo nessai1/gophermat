@@ -12,6 +12,7 @@ var ErrIncorrectUserPassword = errors.New("user password is wrong")
 var ErrLoginAlreadyExists = errors.New("input user login already exists")
 
 type User struct {
+	ID      int
 	Login   string
 	Balance float32
 
