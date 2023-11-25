@@ -84,7 +84,9 @@ func (handler *AuthHandler) HandleAuthUser(writer http.ResponseWriter, request *
 	http.SetCookie(writer, c)
 
 	ctx := request.Context()
-	request.WithContext(context.WithValue(ctx, AuthorizeUserContext, fetchedUser))
+
+	handler.Logger.Debug("user successful authorized by request", zap.String("user login", fetchedUser.Login))
+	request = request.WithContext(context.WithValue(ctx, AuthorizeUserContext, fetchedUser))
 
 	writer.WriteHeader(http.StatusOK)
 }
@@ -134,8 +136,10 @@ func (handler *AuthHandler) HandleRegisterUser(writer http.ResponseWriter, reque
 	c := &http.Cookie{Name: authCookieName, Value: sign}
 	http.SetCookie(writer, c)
 
+	handler.Logger.Debug("user successful registered by request", zap.String("user login", createdUser.Login))
+
 	ctx := request.Context()
-	request.WithContext(context.WithValue(ctx, AuthorizeUserContext, createdUser))
+	request = request.WithContext(context.WithValue(ctx, AuthorizeUserContext, createdUser))
 
 	writer.WriteHeader(http.StatusOK)
 }
@@ -172,7 +176,9 @@ func (handler *AuthHandler) MiddlewareAuthorizeRequest() func(handler http.Handl
 				return
 			}
 
-			request.WithContext(context.WithValue(ctx, AuthorizeUserContext, authUser))
+			handler.Logger.Debug("user successful authorized", zap.String("user login", authUser.Login))
+
+			request = request.WithContext(context.WithValue(ctx, AuthorizeUserContext, authUser))
 
 			next.ServeHTTP(writer, request)
 		})
