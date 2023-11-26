@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"bytes"
+	"errors"
 	"github.com/nessai1/gophermat/internal/order"
 	"github.com/nessai1/gophermat/internal/user"
-	"go.uber.org/zap"
 	"net/http"
+
+	"go.uber.org/zap"
 )
 
 type EnrollmentOrderHandler struct {
@@ -27,7 +30,51 @@ func (handler *EnrollmentOrderHandler) HandleLoadOrders(writer http.ResponseWrit
 		return
 	}
 
-	writer.Write([]byte(ctxUser.Login))
+	var buffer bytes.Buffer
+	_, err := buffer.ReadFrom(request.Body)
+	if err != nil {
+		handler.Logger.Debug("user sends invalid request")
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	orderNumber := buffer.String()
+	enrollmentOrder, err := handler.EnrollmentController.RequireOrder(request.Context(), orderNumber, ctxUser.ID)
+	if err != nil && errors.Is(err, order.ErrInvalidOrderNumber) {
+		handler.Logger.Debug("user register order number with invalid format", zap.String("order number", orderNumber))
+		writer.WriteHeader(http.StatusUnprocessableEntity)
+		return
+	}
+
+	if enrollmentOrder.UserID != ctxUser.ID {
+		handler.Logger.Debug(
+			"user register someone else's order",
+			zap.String("order number", orderNumber),
+			zap.Int("request user id", ctxUser.ID),
+			zap.Int("order owner user id", ctxUser.ID),
+		)
+
+		writer.WriteHeader(http.StatusConflict)
+		return
+	}
+
+	if enrollmentOrder.Status == order.EnrollmentStatusNew {
+		handler.Logger.Debug(
+			"user successful load new order",
+			zap.String("order number", orderNumber),
+			zap.Int("user id", ctxUser.ID),
+		)
+		writer.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	handler.Logger.Debug(
+		"user try to load already exists own order",
+		zap.String("order number", orderNumber),
+		zap.Int("user id", ctxUser.ID),
+	)
+
+	writer.WriteHeader(http.StatusOK)
 }
 
 func (handler *EnrollmentOrderHandler) HandGetOrders(writer http.ResponseWriter, request *http.Request) {

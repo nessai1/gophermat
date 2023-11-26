@@ -15,6 +15,7 @@ const (
 	EnrollmentStatusProcessed  = "PROCESSED"  // Данные по заказу проверены и информация о расчёте успешно получена
 )
 
+// Статусы внешнего сервиса
 const (
 	orderAccrualStatusRegistered = "REGISTERED"
 	orderAccrualStatusInvalid    = "INVALID"
@@ -68,24 +69,34 @@ func (controller *EnrollmentController) RequireOrder(ctx context.Context, orderN
 	}
 
 	if enrollment.UserID == userID && enrollment.Status == EnrollmentStatusNew {
-		err = controller.repository.ChangeStatus(ctx, orderNumber, EnrollmentStatusProcessing)
+		err = controller.LoadOrder(ctx, enrollment.OrderID)
 		if err != nil {
-			return nil, fmt.Errorf("error while update order status in require: %w", err)
+			return nil, fmt.Errorf("error while start order loading operation: %w", err)
 		}
-		go func(orderNumber string, completeFetchOrderCh chan<- OrderAccrualInfo) {
-
-			// Тут создается клиент и делается запрос на внешний сервис - GET /api/orders/{number}
-			// Если код ответа 429 - делается повторный запрос после таймера на Retry-After секунд. И так повторяется пока не будет другого ответа
-
-			testAccrualInfo := OrderAccrualInfo{
-				Order:   orderNumber,
-				Status:  orderAccrualStatusRegistered,
-				Accrual: 0,
-			}
-
-			completeFetchOrderCh <- testAccrualInfo
-		}(orderNumber, controller.completeFetchOrderCh)
 	}
 
 	return enrollment, nil
+}
+
+func (controller *EnrollmentController) LoadOrder(ctx context.Context, orderNumber string) error {
+	err := controller.repository.ChangeStatus(ctx, orderNumber, EnrollmentStatusProcessing)
+	if err != nil {
+		return fmt.Errorf("error while update order status in require: %w", err)
+	}
+
+	go func(orderNumber string, completeFetchOrderCh chan<- OrderAccrualInfo) {
+
+		// Тут создается клиент и делается запрос на внешний сервис - GET /api/orders/{number}
+		// Если код ответа 429 - делается повторный запрос после таймера на Retry-After секунд. И так повторяется пока не будет другого ответа
+
+		testAccrualInfo := OrderAccrualInfo{
+			Order:   orderNumber,
+			Status:  orderAccrualStatusRegistered,
+			Accrual: 0,
+		}
+
+		completeFetchOrderCh <- testAccrualInfo
+	}(orderNumber, controller.completeFetchOrderCh)
+
+	return nil
 }
