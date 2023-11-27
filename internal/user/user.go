@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 var ErrUserNotFound = errors.New("user not found")
@@ -14,14 +16,49 @@ var ErrLoginAlreadyExists = errors.New("input user login already exists")
 type User struct {
 	ID      int
 	Login   string
-	Balance float32
+	Balance int64
 
 	password string
+}
+
+func parseBalance(balance string) (int64, error) {
+	parts := strings.Split(balance, ".")
+
+	if len(parts) > 2 {
+		return 0, fmt.Errorf("parts of balance must be less than 3, got %d", len(parts))
+	}
+
+	bigPart, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, err
+	}
+
+	val := int64(bigPart * 100)
+
+	if len(parts) == 2 {
+		smallPart, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return 0, err
+		}
+
+		if smallPart >= 100 {
+			return 0, fmt.Errorf("small part must be less than 100")
+		}
+
+		if smallPart < 10 {
+			val += int64(smallPart * 10)
+		} else {
+			val += int64(smallPart)
+		}
+	}
+
+	return val, nil
 }
 
 type Repository interface {
 	GetUserByLogin(context.Context, string) (*User, error)
 	CreateUser(context.Context, *User) error
+	//AddBalanceByID(context.Context, int, int) error
 }
 
 type Controller struct {
@@ -72,6 +109,11 @@ func (controller *Controller) AddUser(ctx context.Context, login, password strin
 
 	return &user, nil
 }
+
+//
+//func (controller *Controller) AddBalanceByID(ctx context.Context, userID int, balance float32) error {
+//	return controller.repository.AddBalanceByID(ctx, userID, balance)
+//}
 
 func buildPasswordHash(password string) string {
 	shaSum := sha256.Sum256([]byte(password))

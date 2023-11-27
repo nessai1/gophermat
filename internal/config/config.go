@@ -2,17 +2,17 @@ package config
 
 import (
 	"flag"
-	"os"
-	"sync"
-
 	"github.com/joho/godotenv"
+	"os"
 )
 
 type EnvType string
 
-const EnvTypeDevelopment EnvType = "development"
-const EnvTypeStage EnvType = "stage"
-const EnvTypeProduction EnvType = "production"
+const (
+	EnvTypeDevelopment EnvType = "development"
+	EnvTypeStage       EnvType = "stage"
+	EnvTypeProduction  EnvType = "production"
+)
 
 type Config struct {
 	ServiceAddr        string
@@ -22,15 +22,8 @@ type Config struct {
 	EnvType            EnvType
 }
 
-var config *Config
-var once sync.Once
-
 func GetConfig() *Config {
-	once.Do(func() {
-		config = fetchConfig()
-	})
-
-	return config
+	return fetchConfig()
 }
 
 func fetchConfig() *Config {

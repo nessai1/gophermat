@@ -11,7 +11,7 @@ import (
 func TestController_GetUserByCredentials(t *testing.T) {
 	userOnePassword := "superSecret"
 	userOneLogin := "userOne"
-	userOneBalance := float32(300)
+	userOneBalance := int64(300)
 	users := map[string]User{
 		userOneLogin: {
 			Login:    userOneLogin,
@@ -84,4 +84,86 @@ func Test_buildPasswordHash(t *testing.T) {
 
 	h = buildPasswordHash(superSecret) // second check for invariance
 	assert.Truef(t, h == superSecretHash, "hash must be equal (%s == %s)", h, superSecretHash)
+}
+
+func TestParseBalance(t *testing.T) {
+	tests := []struct {
+		name     string
+		hasError bool
+		in       string
+		out      int64
+	}{
+		{
+			name:     "Correct val 1",
+			hasError: false,
+			in:       "42.10",
+			out:      4210,
+		},
+		{
+			name:     "Correct val 2",
+			hasError: false,
+			in:       "42.7",
+			out:      4270,
+		},
+		{
+			name:     "Correct val 3",
+			hasError: false,
+			in:       "42",
+			out:      4200,
+		},
+		{
+			name:     "Incorrect val 1",
+			hasError: true,
+			in:       "foo",
+			out:      0,
+		},
+		{
+			name:     "Incorrect val 2",
+			hasError: true,
+			in:       "foo.bar",
+			out:      0,
+		},
+		{
+			name:     "Incorrect val 3",
+			hasError: true,
+			in:       "54.ad",
+			out:      0,
+		},
+		{
+			name:     "Incorrect val 4",
+			hasError: true,
+			in:       "56.100",
+			out:      0,
+		},
+		{
+			name:     "Incorrect val 5",
+			hasError: true,
+			in:       "fa.42",
+			out:      0,
+		},
+		{
+			name:     "Incorrect val 6",
+			hasError: true,
+			in:       "23a.4bd",
+			out:      0,
+		},
+		{
+			name:     "Incorrect val 7",
+			hasError: true,
+			in:       "65.32.22",
+			out:      0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			val, err := parseBalance(tt.in)
+			assert.Equal(t, tt.out, val)
+			if tt.hasError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
