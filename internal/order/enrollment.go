@@ -1,12 +1,19 @@
 package order
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/nessai1/gophermat/internal/user"
+	"net/http"
+	"strconv"
+	"time"
 )
 
 var ErrEnrollmentNotFound = errors.New("enrollment not found")
+var ErrEnrollmentAlreadyExists = errors.New("enrollment already exists")
 
 const (
 	EnrollmentStatusNew        = "NEW"        // Заказ загружен в систему, но не попал в обработку
@@ -24,33 +31,32 @@ const (
 )
 
 type OrderAccrualInfo struct {
-	Order   string  `json:"order"`
-	Status  string  `json:"status"`
-	Accrual float32 `json:"accrual"`
+	Order   string      `json:"order"`
+	Status  string      `json:"status"`
+	Accrual json.Number `json:"accrual"`
 }
 
 type EnrollmentController struct {
-	completeFetchOrderCh chan OrderAccrualInfo
-	orderServiceAddr     string
-	repository           EnrollmentRepository
+	orderServiceAddr string
+	repository       EnrollmentRepository
+	userController   *user.Controller
 }
 
 type Enrollment struct {
-	UserID        int
-	OrderID       string
-	Status        string
-	Accrual       float32
-	IsTransferred bool
+	UserID  int
+	OrderID string
+	Status  string
+	Accrual int64
 }
 
 type EnrollmentRepository interface {
 	GetByID(ctx context.Context, orderID string) (*Enrollment, error)
-	CreateNewOrder(ctx context.Context, orderID string) (*Enrollment, error)
+	CreateNewOrder(ctx context.Context, orderID string, ownerID int) (*Enrollment, error)
 	ChangeStatus(ctx context.Context, orderID, status string) error
 }
 
-func NewEnrollmentController(orderServiceAddr string, repository EnrollmentRepository) *EnrollmentController {
-	return &EnrollmentController{orderServiceAddr: orderServiceAddr, repository: repository} // TODO: Create channel handler
+func NewEnrollmentController(orderServiceAddr string, repository EnrollmentRepository, userController *user.Controller) *EnrollmentController {
+	return &EnrollmentController{orderServiceAddr: orderServiceAddr, repository: repository, userController: userController} // TODO: Create channel handler
 }
 
 func (controller *EnrollmentController) RequireOrder(ctx context.Context, orderNumber string, userID int) (*Enrollment, error) {
@@ -60,7 +66,7 @@ func (controller *EnrollmentController) RequireOrder(ctx context.Context, orderN
 
 	enrollment, err := controller.repository.GetByID(ctx, orderNumber)
 	if err != nil && errors.Is(err, ErrEnrollmentNotFound) {
-		enrollment, err = controller.repository.CreateNewOrder(ctx, orderNumber)
+		enrollment, err = controller.repository.CreateNewOrder(ctx, orderNumber, userID)
 		if err != nil {
 			return nil, fmt.Errorf("error while create new enrollment order: %w", err)
 		}
@@ -69,7 +75,7 @@ func (controller *EnrollmentController) RequireOrder(ctx context.Context, orderN
 	}
 
 	if enrollment.UserID == userID && enrollment.Status == EnrollmentStatusNew {
-		err = controller.LoadOrder(ctx, enrollment.OrderID)
+		err = controller.LoadOrder(ctx, userID, enrollment.OrderID)
 		if err != nil {
 			return nil, fmt.Errorf("error while start order loading operation: %w", err)
 		}
@@ -78,25 +84,61 @@ func (controller *EnrollmentController) RequireOrder(ctx context.Context, orderN
 	return enrollment, nil
 }
 
-func (controller *EnrollmentController) LoadOrder(ctx context.Context, orderNumber string) error {
+func (controller *EnrollmentController) LoadOrder(ctx context.Context, ownerID int, orderNumber string) error {
 	err := controller.repository.ChangeStatus(ctx, orderNumber, EnrollmentStatusProcessing)
 	if err != nil {
 		return fmt.Errorf("error while update order status in require: %w", err)
 	}
 
-	go func(orderNumber string, completeFetchOrderCh chan<- OrderAccrualInfo) {
+	go func(serviceAddr, orderNumber string, ownerID int, enrollmentRepository EnrollmentRepository, userController *user.Controller) {
+		for {
+			resp, err := http.Get(serviceAddr + "/api/orders/" + orderNumber)
+			if err != nil {
+				break
+			}
 
-		// Тут создается клиент и делается запрос на внешний сервис - GET /api/orders/{number}
-		// Если код ответа 429 - делается повторный запрос после таймера на Retry-After секунд. И так повторяется пока не будет другого ответа
+			if resp.StatusCode == http.StatusTooManyRequests {
+				retryAfter := resp.Header.Get("Retry-After")
+				retryAfterInt, _ := strconv.Atoi(retryAfter)
+				time.Sleep(time.Second * time.Duration(retryAfterInt))
+				continue
+			}
 
-		testAccrualInfo := OrderAccrualInfo{
-			Order:   orderNumber,
-			Status:  orderAccrualStatusRegistered,
-			Accrual: 0,
+			if resp.StatusCode != http.StatusOK {
+				break
+			}
+
+			var buffer bytes.Buffer
+			buffer.ReadFrom(resp.Body)
+			var accrualInfo OrderAccrualInfo
+			json.Unmarshal(buffer.Bytes(), &accrualInfo)
+			if accrualInfo.Status == orderAccrualStatusInvalid {
+				enrollmentRepository.ChangeStatus(context.TODO(), orderNumber, EnrollmentStatusInvalid)
+				return
+			}
+
+			if accrualInfo.Status == orderAccrualStatusProcessing || accrualInfo.Status == orderAccrualStatusRegistered {
+				time.Sleep(time.Second * 5)
+				continue
+			}
+
+			enrollmentRepository.ChangeStatus(context.TODO(), orderNumber, EnrollmentStatusProcessed)
+			owner, err := userController.GetUserByID(context.TODO(), ownerID)
+			if err != nil {
+				return
+			}
+
+			df, err := user.ParseBalance(string(accrualInfo.Accrual))
+			if err != nil {
+				return
+			}
+
+			balance := owner.Balance + df
+			userController.SetUserBalanceByID(context.TODO(), ownerID, balance)
+			return
 		}
 
-		completeFetchOrderCh <- testAccrualInfo
-	}(orderNumber, controller.completeFetchOrderCh)
+	}(controller.orderServiceAddr, orderNumber, ownerID, controller.repository, controller.userController)
 
 	return nil
 }

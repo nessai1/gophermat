@@ -25,3 +25,23 @@ func (repository *MapRepository) CreateUser(_ context.Context, user *User) error
 	repository.data[user.Login] = *user
 	return nil
 }
+
+func (repository *MapRepository) SetUserBalanceByID(_ context.Context, userID int, balance int64) error {
+	for _, user := range repository.data {
+		if user.ID == userID {
+			user.Balance = balance
+		}
+	}
+
+	return ErrUserNotFound
+}
+
+func (repository *MapRepository) GetUserByID(ctx context.Context, userID int) (*User, error) {
+	for _, user := range repository.data {
+		if user.ID == userID {
+			return &user, nil
+		}
+	}
+
+	return nil, ErrUserNotFound
+}

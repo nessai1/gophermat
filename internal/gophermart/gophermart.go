@@ -28,9 +28,10 @@ func Start() error {
 		return fmt.Errorf("cannot initialize database on start service: %w", err)
 	}
 
+	userController := user.NewController(user.CreatePGXRepository(db))
 	authHandler := handler.AuthHandler{
 		Logger:         log,
-		UserController: user.NewController(user.CreatePGXRepository(db)),
+		UserController: userController,
 	}
 
 	authMux := chi.NewMux()
@@ -39,12 +40,12 @@ func Start() error {
 
 	enrollmentController := handler.EnrollmentOrderHandler{
 		Logger:               log,
-		EnrollmentController: order.NewEnrollmentController(cfg.AccrualServiceAddr, order.CreatePGXEnrollmentRepository(db)),
+		EnrollmentController: order.NewEnrollmentController(cfg.AccrualServiceAddr, order.CreatePGXEnrollmentRepository(db), userController),
 	}
 	enrollmentMux := chi.NewMux()
 	enrollmentMux.Use(authHandler.MiddlewareAuthorizeRequest())
 	enrollmentMux.Post("/", enrollmentController.HandleLoadOrders)
-	enrollmentMux.Get("/", enrollmentController.HandGetOrders)
+	enrollmentMux.Get("/", enrollmentController.HandleGetOrders)
 
 	balanceController := handler.BalanceHandler{
 		Logger: log,

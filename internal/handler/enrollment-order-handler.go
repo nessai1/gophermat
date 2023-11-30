@@ -77,6 +77,20 @@ func (handler *EnrollmentOrderHandler) HandleLoadOrders(writer http.ResponseWrit
 	writer.WriteHeader(http.StatusOK)
 }
 
-func (handler *EnrollmentOrderHandler) HandGetOrders(writer http.ResponseWriter, request *http.Request) {
-	writer.Write([]byte("Getting orders...."))
+func (handler *EnrollmentOrderHandler) HandleGetOrders(writer http.ResponseWriter, request *http.Request) {
+	//ctxUserVal := request.Context().Value(AuthorizeUserContext)
+	//if ctxUserVal == nil {
+	//	handler.Logger.Error("load orders handler must have user in context, but not found")
+	//	writer.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
+	//
+	//ctxUser, ok := ctxUserVal.(*user.User)
+	//if !ok {
+	//	handler.Logger.Error("cannot cast user in request context while load order")
+	//	writer.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
+	//
+	//handler.EnrollmentController.GetUserOrderListByID(ctxUser.ID)
 }

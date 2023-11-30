@@ -157,7 +157,7 @@ func TestParseBalance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			val, err := parseBalance(tt.in)
+			val, err := ParseBalance(tt.in)
 			assert.Equal(t, tt.out, val)
 			if tt.hasError {
 				assert.Error(t, err)

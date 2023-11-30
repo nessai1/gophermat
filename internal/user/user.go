@@ -21,7 +21,7 @@ type User struct {
 	password string
 }
 
-func parseBalance(balance string) (int64, error) {
+func ParseBalance(balance string) (int64, error) {
 	parts := strings.Split(balance, ".")
 
 	if len(parts) > 2 {
@@ -58,7 +58,8 @@ func parseBalance(balance string) (int64, error) {
 type Repository interface {
 	GetUserByLogin(context.Context, string) (*User, error)
 	CreateUser(context.Context, *User) error
-	//AddBalanceByID(context.Context, int, int) error
+	GetUserByID(context.Context, int) (*User, error)
+	SetUserBalanceByID(context.Context, int, int64) error
 }
 
 type Controller struct {
@@ -90,6 +91,11 @@ func (controller *Controller) GetUserByLogin(ctx context.Context, login string) 
 	return user, err
 }
 
+func (controller *Controller) GetUserByID(ctx context.Context, id int) (*User, error) {
+	user, err := controller.repository.GetUserByID(ctx, id)
+	return user, err
+}
+
 func (controller *Controller) AddUser(ctx context.Context, login, password string) (*User, error) {
 	passwordHash := buildPasswordHash(password)
 
@@ -108,6 +114,10 @@ func (controller *Controller) AddUser(ctx context.Context, login, password strin
 	}
 
 	return &user, nil
+}
+
+func (controller *Controller) SetUserBalanceByID(ctx context.Context, userID int, balance int64) error {
+	return controller.repository.SetUserBalanceByID(ctx, userID, balance)
 }
 
 //
