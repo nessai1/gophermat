@@ -20,7 +20,7 @@ type EnrollmentOrderHandler struct {
 type EnrollmentItem struct {
 	OrderID    string    `json:"number"`
 	Status     string    `json:"status"`
-	Accrual    float32   `json:"accrual"`
+	Accrual    float32   `json:"accrual,omitempty"`
 	UploadedAt time.Time `json:"uploaded_at"`
 }
 
