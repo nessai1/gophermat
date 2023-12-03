@@ -1,6 +1,6 @@
 BEGIN;
 CREATE TABLE enrollment_order (
-    order_id varchar(16) not null PRIMARY KEY,
+    order_id varchar(100) not null PRIMARY KEY,
     user_id int not null references "user" (id),
     status varchar(30) not null,
     accrual bigint not null default 0,

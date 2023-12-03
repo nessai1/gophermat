@@ -40,6 +40,7 @@ type EnrollmentController struct {
 	orderServiceAddr string
 	repository       EnrollmentRepository
 	userController   *user.Controller
+	dataSource       DataSource
 }
 
 type Enrollment struct {
@@ -59,7 +60,7 @@ type EnrollmentRepository interface {
 }
 
 func NewEnrollmentController(orderServiceAddr string, repository EnrollmentRepository, userController *user.Controller) *EnrollmentController {
-	return &EnrollmentController{orderServiceAddr: orderServiceAddr, repository: repository, userController: userController} // TODO: Create channel handler
+	return &EnrollmentController{orderServiceAddr: orderServiceAddr, repository: repository, userController: userController}
 }
 
 func (controller *EnrollmentController) RequireOrder(ctx context.Context, orderNumber string, userID int) (*Enrollment, error) {
@@ -124,6 +125,8 @@ func (controller *EnrollmentController) LoadOrder(ctx context.Context, ownerID i
 				time.Sleep(time.Second * 5)
 				continue
 			}
+
+			// need transaction
 
 			enrollmentRepository.ChangeStatus(context.TODO(), orderNumber, EnrollmentStatusProcessed)
 			owner, err := userController.GetUserByID(context.TODO(), ownerID)

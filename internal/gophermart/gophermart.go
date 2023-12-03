@@ -48,17 +48,23 @@ func Start() error {
 	enrollmentMux.Get("/", enrollmentController.HandleGetOrders)
 
 	balanceController := handler.BalanceHandler{
-		Logger: log,
+		Logger:             log,
+		WithdrawController: order.NewWithdrawController(order.NewPGXWithdrawRepository(db), userController),
 	}
+
 	balanceMux := chi.NewMux()
 	balanceMux.Use(authHandler.MiddlewareAuthorizeRequest())
 	balanceMux.Get("/", balanceController.HandleGetBalance)
-	balanceMux.Post("/withdraw", balanceController.HandleWithdraw)
+	balanceMux.Post("/withdraw", balanceController.HandleAddWithdraw)
+
+	withdrawInfoMux := chi.NewMux()
+	withdrawInfoMux.Use(authHandler.MiddlewareAuthorizeRequest())
+	withdrawInfoMux.Get("/", balanceController.HandleGetListWithdraw)
 
 	router.Mount("/", authMux)
 	router.Mount("/api/user/orders", enrollmentMux)
 	router.Mount("/api/user/balance", balanceMux)
-	// TODO: add /api/user/withdrawals handle
+	router.Mount("/api/user/withdrawals", withdrawInfoMux)
 
 	log.Info("starting service", zap.String("service address", cfg.ServiceAddr))
 

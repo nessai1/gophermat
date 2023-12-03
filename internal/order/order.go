@@ -7,6 +7,15 @@ import (
 
 var ErrInvalidOrderNumber = errors.New("invalid order number")
 
+type DataSource interface {
+	Begin() (*Transaction, error)
+}
+
+type Transaction interface {
+	Commit() error
+	Rollback() error
+}
+
 func IsOrderNumberCorrect(orderNumber string) bool {
 	sum := 0
 
