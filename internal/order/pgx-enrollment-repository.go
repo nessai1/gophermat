@@ -64,3 +64,34 @@ func (repository *PGXEnrollmentRepository) ChangeStatus(ctx context.Context, ord
 	_, err := repository.db.ExecContext(ctx, "UPDATE enrollment_order SET status = $1 WHERE order_id = $2", status, orderID)
 	return err
 }
+
+func (repository *PGXEnrollmentRepository) UpdateOrderAccrual(ctx context.Context, orderID string, accrual int) error {
+	_, err := repository.db.ExecContext(ctx, "UPDATE enrollment_order SET accrual = $1 WHERE order_id = $2", accrual, orderID)
+	return err
+}
+
+func (repository *PGXEnrollmentRepository) GetListByUserID(ctx context.Context, userID int) ([]*Enrollment, error) {
+	rows, err := repository.db.QueryContext(ctx, "SELECT order_id, status, accrual, uploaded_at FROM enrollment_order WHERE user_id = $1 ORDER BY uploaded_at ASC", userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	enrollmentList := make([]*Enrollment, 0)
+
+	for rows.Next() {
+		if err = rows.Err(); err != nil {
+			return nil, err
+		}
+
+		enrollment := Enrollment{UserID: userID}
+		err = rows.Scan(&enrollment.OrderID, &enrollment.Status, &enrollment.Accrual, &enrollment.UploadedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		enrollmentList = append(enrollmentList, &enrollment)
+	}
+
+	return enrollmentList, nil
+}

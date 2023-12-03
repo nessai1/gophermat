@@ -2,10 +2,12 @@ package handler
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"github.com/nessai1/gophermat/internal/order"
 	"github.com/nessai1/gophermat/internal/user"
 	"net/http"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -13,6 +15,13 @@ import (
 type EnrollmentOrderHandler struct {
 	Logger               *zap.Logger
 	EnrollmentController *order.EnrollmentController
+}
+
+type EnrollmentItem struct {
+	OrderID    string    `json:"number"`
+	Status     string    `json:"status"`
+	Accrual    float32   `json:"accrual"`
+	UploadedAt time.Time `json:"uploaded_at"`
 }
 
 func (handler *EnrollmentOrderHandler) HandleLoadOrders(writer http.ResponseWriter, request *http.Request) {
@@ -78,19 +87,52 @@ func (handler *EnrollmentOrderHandler) HandleLoadOrders(writer http.ResponseWrit
 }
 
 func (handler *EnrollmentOrderHandler) HandleGetOrders(writer http.ResponseWriter, request *http.Request) {
-	//ctxUserVal := request.Context().Value(AuthorizeUserContext)
-	//if ctxUserVal == nil {
-	//	handler.Logger.Error("load orders handler must have user in context, but not found")
-	//	writer.WriteHeader(http.StatusInternalServerError)
-	//	return
-	//}
-	//
-	//ctxUser, ok := ctxUserVal.(*user.User)
-	//if !ok {
-	//	handler.Logger.Error("cannot cast user in request context while load order")
-	//	writer.WriteHeader(http.StatusInternalServerError)
-	//	return
-	//}
-	//
-	//handler.EnrollmentController.GetUserOrderListByID(ctxUser.ID)
+	ctxUserVal := request.Context().Value(AuthorizeUserContext)
+	if ctxUserVal == nil {
+		handler.Logger.Error("load orders handler must have user in context, but not found")
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ctxUser, ok := ctxUserVal.(*user.User)
+	if !ok {
+		handler.Logger.Error("cannot cast user in request context while load order")
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	enrollmentList, err := handler.EnrollmentController.GetUserOrderListByID(request.Context(), ctxUser.ID)
+	if err != nil {
+		handler.Logger.Error("error while get enrollment list for user", zap.Int("user id", ctxUser.ID), zap.Error(err))
+		writer.WriteHeader(http.StatusInternalServerError)
+	}
+
+	if len(enrollmentList) == 0 {
+		writer.WriteHeader(http.StatusNoContent)
+	}
+
+	resultEnrollmentList := make([]EnrollmentItem, len(enrollmentList))
+	for i := 0; i < len(enrollmentList); i++ {
+		item := EnrollmentItem{
+			OrderID:    enrollmentList[i].OrderID,
+			Status:     enrollmentList[i].Status,
+			Accrual:    float32(enrollmentList[i].Accrual) / 100,
+			UploadedAt: enrollmentList[i].UploadedAt,
+		}
+
+		resultEnrollmentList[i] = item
+	}
+
+	rs, err := json.Marshal(resultEnrollmentList)
+	if err != nil {
+		handler.Logger.Error("error while marshal list of user enrollments", zap.Error(err))
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	_, err = writer.Write(rs)
+	if err != nil {
+		handler.Logger.Error("error while write enrollment list to result body", zap.Error(err))
+		writer.WriteHeader(http.StatusInternalServerError)
+	}
 }

@@ -43,16 +43,19 @@ type EnrollmentController struct {
 }
 
 type Enrollment struct {
-	UserID  int
-	OrderID string
-	Status  string
-	Accrual int64
+	UserID     int
+	OrderID    string
+	Status     string
+	Accrual    int64
+	UploadedAt time.Time
 }
 
 type EnrollmentRepository interface {
 	GetByID(ctx context.Context, orderID string) (*Enrollment, error)
 	CreateNewOrder(ctx context.Context, orderID string, ownerID int) (*Enrollment, error)
 	ChangeStatus(ctx context.Context, orderID, status string) error
+	UpdateOrderAccrual(ctx context.Context, orderID string, accrual int) error
+	GetListByUserID(ctx context.Context, userID int) ([]*Enrollment, error)
 }
 
 func NewEnrollmentController(orderServiceAddr string, repository EnrollmentRepository, userController *user.Controller) *EnrollmentController {
@@ -133,6 +136,8 @@ func (controller *EnrollmentController) LoadOrder(ctx context.Context, ownerID i
 				return
 			}
 
+			enrollmentRepository.UpdateOrderAccrual(context.TODO(), orderNumber, int(df))
+
 			balance := owner.Balance + df
 			userController.SetUserBalanceByID(context.TODO(), ownerID, balance)
 			return
@@ -141,4 +146,10 @@ func (controller *EnrollmentController) LoadOrder(ctx context.Context, ownerID i
 	}(controller.orderServiceAddr, orderNumber, ownerID, controller.repository, controller.userController)
 
 	return nil
+}
+
+func (controller *EnrollmentController) GetUserOrderListByID(ctx context.Context, userID int) ([]*Enrollment, error) {
+	enrollmentList, err := controller.repository.GetListByUserID(ctx, userID)
+
+	return enrollmentList, err
 }
