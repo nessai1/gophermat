@@ -95,3 +95,29 @@ func (repository *PGXEnrollmentRepository) GetListByUserID(ctx context.Context, 
 
 	return enrollmentList, nil
 }
+
+func (repository *PGXEnrollmentRepository) GetProcessedEnrollments(ctx context.Context) ([]*Enrollment, error) {
+	rows, err := repository.db.QueryContext(ctx, "SELECT order_id, user_id, status, accrual, uploaded_at FROM enrollment_order WHERE status IN ($1, $2) ORDER BY uploaded_at ASC", EnrollmentStatusNew, EnrollmentStatusProcessing)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	enrollmentList := make([]*Enrollment, 0)
+
+	for rows.Next() {
+		if err = rows.Err(); err != nil {
+			return nil, err
+		}
+
+		enrollment := Enrollment{}
+		err = rows.Scan(&enrollment.OrderID, &enrollment.UserID, &enrollment.Status, &enrollment.Accrual, &enrollment.UploadedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		enrollmentList = append(enrollmentList, &enrollment)
+	}
+
+	return enrollmentList, nil
+}

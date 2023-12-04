@@ -119,6 +119,9 @@ func (handler *BalanceHandler) HandleAddWithdraw(writer http.ResponseWriter, req
 		} else if errors.Is(err, order.ErrNoMoney) {
 			writer.WriteHeader(http.StatusPaymentRequired)
 			handler.Logger.Debug("user has no money to withdraw", zap.Int64("user balance", ctxUser.Balance), zap.Int64("required sum", sum))
+		} else if errors.Is(err, order.ErrEmptyBalance) {
+			writer.WriteHeader(http.StatusBadRequest)
+			handler.Logger.Debug("user sends empty sum to withdraw")
 		} else {
 			writer.WriteHeader(http.StatusInternalServerError)
 			handler.Logger.Error("server error while create withdraw", zap.Error(err))

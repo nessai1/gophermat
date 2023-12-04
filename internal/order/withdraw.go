@@ -3,6 +3,8 @@ package order
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/nessai1/gophermat/internal/intransaction"
 	"github.com/nessai1/gophermat/internal/user"
 	"time"
 )
@@ -24,39 +26,51 @@ type WithdrawRepository interface {
 type WithdrawController struct {
 	repository     WithdrawRepository
 	userController *user.Controller
+	transaction    intransaction.Transaction
 }
 
-func NewWithdrawController(repository WithdrawRepository, userController *user.Controller) *WithdrawController {
+func NewWithdrawController(repository WithdrawRepository, userController *user.Controller, transaction intransaction.Transaction) *WithdrawController {
 	return &WithdrawController{
 		repository:     repository,
 		userController: userController,
+		transaction:    transaction,
 	}
 }
 
 func (controller *WithdrawController) CreateWithdrawByUser(ctx context.Context, innerUser *user.User, orderID string, sum int64) (*Withdraw, error) {
-	// need transaction
 
 	if !IsOrderNumberCorrect(orderID) {
 		return nil, ErrInvalidOrderNumber
+	}
+
+	if sum == 0 {
+		return nil, ErrEmptyBalance
 	}
 
 	if sum > innerUser.Balance {
 		return nil, ErrNoMoney
 	}
 
-	balance := innerUser.Balance - sum
-	err := controller.userController.SetUserBalanceByID(ctx, innerUser.ID, balance)
+	var withdraw *Withdraw
+	err := controller.transaction.InTransaction(ctx, func(innerCtx context.Context) error {
+		balance := innerUser.Balance - sum
+		txErr := controller.userController.SetUserBalanceByID(ctx, innerUser.ID, balance)
+		if txErr != nil {
+			return fmt.Errorf("error while set user balance: %w", txErr)
+		}
+
+		withdraw, txErr = controller.repository.AddWithdraw(ctx, innerUser.ID, orderID, sum)
+
+		if txErr != nil {
+			return fmt.Errorf("error while add withdraw: %w", txErr)
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while create withdraw by user: %w", err)
 	}
-
-	withdraw, err := controller.repository.AddWithdraw(ctx, innerUser.ID, orderID, sum)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// stop transaction
 
 	return withdraw, nil
 }

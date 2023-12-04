@@ -2,16 +2,16 @@ package gophermart
 
 import (
 	"fmt"
+	"github.com/go-chi/chi"
 	"github.com/nessai1/gophermat/internal/config"
 	"github.com/nessai1/gophermat/internal/database"
 	"github.com/nessai1/gophermat/internal/handler"
+	"github.com/nessai1/gophermat/internal/intransaction"
 	"github.com/nessai1/gophermat/internal/logger"
 	"github.com/nessai1/gophermat/internal/order"
 	"github.com/nessai1/gophermat/internal/user"
-	"net/http"
-
-	"github.com/go-chi/chi"
 	"go.uber.org/zap"
+	"net/http"
 )
 
 func Start() error {
@@ -38,28 +38,38 @@ func Start() error {
 	authMux.Post("/api/user/register", authHandler.HandleRegisterUser)
 	authMux.Post("/api/user/login", authHandler.HandleAuthUser)
 
-	enrollmentController := handler.EnrollmentOrderHandler{
+	transaction := intransaction.NewPGXTransaction(db)
+
+	enrollmentController := order.NewEnrollmentController(cfg.AccrualServiceAddr, order.CreatePGXEnrollmentRepository(db), userController)
+	ch, err := order.StartEnrollmentWorker(userController, enrollmentController, log, cfg.AccrualServiceAddr, transaction)
+	if err != nil {
+		return fmt.Errorf("error while starting enrollment worker: %w", err)
+	}
+
+	enrollmentController.EnrollmentCh = ch
+
+	enrollmentHandler := handler.EnrollmentOrderHandler{
 		Logger:               log,
-		EnrollmentController: order.NewEnrollmentController(cfg.AccrualServiceAddr, order.CreatePGXEnrollmentRepository(db), userController),
+		EnrollmentController: enrollmentController,
 	}
 	enrollmentMux := chi.NewMux()
 	enrollmentMux.Use(authHandler.MiddlewareAuthorizeRequest())
-	enrollmentMux.Post("/", enrollmentController.HandleLoadOrders)
-	enrollmentMux.Get("/", enrollmentController.HandleGetOrders)
+	enrollmentMux.Post("/", enrollmentHandler.HandleLoadOrders)
+	enrollmentMux.Get("/", enrollmentHandler.HandleGetOrders)
 
-	balanceController := handler.BalanceHandler{
+	balanceHandler := handler.BalanceHandler{
 		Logger:             log,
-		WithdrawController: order.NewWithdrawController(order.NewPGXWithdrawRepository(db), userController),
+		WithdrawController: order.NewWithdrawController(order.NewPGXWithdrawRepository(db), userController, transaction),
 	}
 
 	balanceMux := chi.NewMux()
 	balanceMux.Use(authHandler.MiddlewareAuthorizeRequest())
-	balanceMux.Get("/", balanceController.HandleGetBalance)
-	balanceMux.Post("/withdraw", balanceController.HandleAddWithdraw)
+	balanceMux.Get("/", balanceHandler.HandleGetBalance)
+	balanceMux.Post("/withdraw", balanceHandler.HandleAddWithdraw)
 
 	withdrawInfoMux := chi.NewMux()
 	withdrawInfoMux.Use(authHandler.MiddlewareAuthorizeRequest())
-	withdrawInfoMux.Get("/", balanceController.HandleGetListWithdraw)
+	withdrawInfoMux.Get("/", balanceHandler.HandleGetListWithdraw)
 
 	router.Mount("/", authMux)
 	router.Mount("/api/user/orders", enrollmentMux)

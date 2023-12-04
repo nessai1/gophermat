@@ -1,14 +1,11 @@
 package order
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/nessai1/gophermat/internal/user"
-	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -40,7 +37,7 @@ type EnrollmentController struct {
 	orderServiceAddr string
 	repository       EnrollmentRepository
 	userController   *user.Controller
-	dataSource       DataSource
+	EnrollmentCh     chan<- Enrollment
 }
 
 type Enrollment struct {
@@ -57,6 +54,7 @@ type EnrollmentRepository interface {
 	ChangeStatus(ctx context.Context, orderID, status string) error
 	UpdateOrderAccrual(ctx context.Context, orderID string, accrual int) error
 	GetListByUserID(ctx context.Context, userID int) ([]*Enrollment, error)
+	GetProcessedEnrollments(ctx context.Context) ([]*Enrollment, error)
 }
 
 func NewEnrollmentController(orderServiceAddr string, repository EnrollmentRepository, userController *user.Controller) *EnrollmentController {
@@ -79,7 +77,7 @@ func (controller *EnrollmentController) RequireOrder(ctx context.Context, orderN
 	}
 
 	if enrollment.UserID == userID && enrollment.Status == EnrollmentStatusNew {
-		err = controller.LoadOrder(ctx, userID, enrollment.OrderID)
+		go controller.loadOrder(enrollment)
 		if err != nil {
 			return nil, fmt.Errorf("error while start order loading operation: %w", err)
 		}
@@ -88,71 +86,26 @@ func (controller *EnrollmentController) RequireOrder(ctx context.Context, orderN
 	return enrollment, nil
 }
 
-func (controller *EnrollmentController) LoadOrder(ctx context.Context, ownerID int, orderNumber string) error {
-	err := controller.repository.ChangeStatus(ctx, orderNumber, EnrollmentStatusProcessing)
-	if err != nil {
-		return fmt.Errorf("error while update order status in require: %w", err)
-	}
+func (controller *EnrollmentController) ChangeStatusByOrderID(ctx context.Context, orderID, status string) error {
+	return controller.repository.ChangeStatus(ctx, orderID, status)
+}
 
-	go func(serviceAddr, orderNumber string, ownerID int, enrollmentRepository EnrollmentRepository, userController *user.Controller) {
-		for {
-			resp, err := http.Get(serviceAddr + "/api/orders/" + orderNumber)
-			if err != nil {
-				break
-			}
+func (controller *EnrollmentController) GetProcessedEnrollments(ctx context.Context) ([]*Enrollment, error) {
+	enrollmentList, err := controller.repository.GetProcessedEnrollments(ctx)
 
-			if resp.StatusCode == http.StatusTooManyRequests {
-				retryAfter := resp.Header.Get("Retry-After")
-				retryAfterInt, _ := strconv.Atoi(retryAfter)
-				time.Sleep(time.Second * time.Duration(retryAfterInt))
-				continue
-			}
+	return enrollmentList, err
+}
 
-			if resp.StatusCode != http.StatusOK {
-				break
-			}
-
-			var buffer bytes.Buffer
-			buffer.ReadFrom(resp.Body)
-			var accrualInfo OrderAccrualInfo
-			json.Unmarshal(buffer.Bytes(), &accrualInfo)
-			if accrualInfo.Status == orderAccrualStatusInvalid {
-				enrollmentRepository.ChangeStatus(context.TODO(), orderNumber, EnrollmentStatusInvalid)
-				return
-			}
-
-			if accrualInfo.Status == orderAccrualStatusProcessing || accrualInfo.Status == orderAccrualStatusRegistered {
-				time.Sleep(time.Second * 5)
-				continue
-			}
-
-			// need transaction
-
-			enrollmentRepository.ChangeStatus(context.TODO(), orderNumber, EnrollmentStatusProcessed)
-			owner, err := userController.GetUserByID(context.TODO(), ownerID)
-			if err != nil {
-				return
-			}
-
-			df, err := user.ParseBalance(string(accrualInfo.Accrual))
-			if err != nil {
-				return
-			}
-
-			enrollmentRepository.UpdateOrderAccrual(context.TODO(), orderNumber, int(df))
-
-			balance := owner.Balance + df
-			userController.SetUserBalanceByID(context.TODO(), ownerID, balance)
-			return
-		}
-
-	}(controller.orderServiceAddr, orderNumber, ownerID, controller.repository, controller.userController)
-
-	return nil
+func (controller *EnrollmentController) loadOrder(enrollment *Enrollment) {
+	controller.EnrollmentCh <- *enrollment
 }
 
 func (controller *EnrollmentController) GetUserOrderListByID(ctx context.Context, userID int) ([]*Enrollment, error) {
 	enrollmentList, err := controller.repository.GetListByUserID(ctx, userID)
 
 	return enrollmentList, err
+}
+
+func (controller *EnrollmentController) UpdateOrderAccrualByID(ctx context.Context, orderID string, accrual int) error {
+	return controller.repository.UpdateOrderAccrual(ctx, orderID, accrual)
 }

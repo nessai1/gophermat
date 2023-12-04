@@ -22,6 +22,10 @@ type User struct {
 }
 
 func ParseBalance(balance string) (int64, error) {
+	if balance == "" {
+		return 0, nil
+	}
+
 	parts := strings.Split(balance, ".")
 
 	if len(parts) > 2 {
