@@ -10,6 +10,7 @@ import (
 	"github.com/nessai1/gophermat/internal/logger"
 	"github.com/nessai1/gophermat/internal/order"
 	"github.com/nessai1/gophermat/internal/user"
+	"github.com/nessai1/gophermat/internal/zip"
 	"go.uber.org/zap"
 	"net/http"
 )
@@ -33,6 +34,8 @@ func Start() error {
 		Logger:         log,
 		UserController: userController,
 	}
+
+	router.Use(zip.GetZipMiddleware(log))
 
 	authMux := chi.NewMux()
 	authMux.Post("/api/user/register", authHandler.HandleRegisterUser)
