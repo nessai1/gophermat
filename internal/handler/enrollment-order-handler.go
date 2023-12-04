@@ -130,6 +130,7 @@ func (handler *EnrollmentOrderHandler) HandleGetOrders(writer http.ResponseWrite
 		return
 	}
 
+	writer.Header().Set("Content-Type", "application/json")
 	_, err = writer.Write(rs)
 	if err != nil {
 		handler.Logger.Error("error while write enrollment list to result body", zap.Error(err))

@@ -66,6 +66,7 @@ func (handler *BalanceHandler) HandleGetBalance(writer http.ResponseWriter, requ
 		return
 	}
 
+	writer.Header().Set("Content-Type", "application/json")
 	_, err = writer.Write(body)
 	if err != nil {
 		handler.Logger.Error("error while write ifo of user balance to body")
@@ -178,6 +179,7 @@ func (handler *BalanceHandler) HandleGetListWithdraw(writer http.ResponseWriter,
 		return
 	}
 
+	writer.Header().Set("Content-Type", "application/json")
 	_, err = writer.Write(rs)
 	if err != nil {
 		handler.Logger.Error("error while write list of withdraw", zap.Error(err))
