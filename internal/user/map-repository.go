@@ -27,9 +27,10 @@ func (repository *MapRepository) CreateUser(_ context.Context, user *User) error
 }
 
 func (repository *MapRepository) SetUserBalanceByID(_ context.Context, userID int, balance int64) error {
-	for _, user := range repository.data {
+	for i, user := range repository.data {
 		if user.ID == userID {
 			user.Balance = balance
+			repository.data[i] = user
 		}
 	}
 

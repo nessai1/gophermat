@@ -51,18 +51,21 @@ func (worker *EnrollmentWorker) requireOrder(enrollment *Enrollment) {
 			retryAfter := resp.Header.Get("Retry-After")
 			retryAfterInt, _ := strconv.Atoi(retryAfter)
 			worker.logger.Info("got many request to accrual service", zap.Int("retry after", retryAfterInt))
+			resp.Body.Close()
 			time.Sleep(time.Second * time.Duration(retryAfterInt))
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK {
 			worker.logger.Error("got unsuccessful status from accrual service", zap.String("status", resp.Status))
+			resp.Body.Close()
 			time.Sleep(time.Second * 5)
 			continue
 		}
 
 		var buffer bytes.Buffer
 		_, err = buffer.ReadFrom(resp.Body)
+		resp.Body.Close()
 		if err != nil {
 			worker.logger.Error("error while read response from accrual service", zap.String("order id", enrollment.OrderID))
 			time.Sleep(time.Second * 5)

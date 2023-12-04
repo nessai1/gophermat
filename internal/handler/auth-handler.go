@@ -83,10 +83,7 @@ func (handler *AuthHandler) HandleAuthUser(writer http.ResponseWriter, request *
 	c := &http.Cookie{Name: authCookieName, Value: sign}
 	http.SetCookie(writer, c)
 
-	ctx := request.Context()
-
 	handler.Logger.Debug("user successful authorized by request", zap.String("user login", fetchedUser.Login))
-	request = request.WithContext(context.WithValue(ctx, AuthorizeUserContext, fetchedUser))
 
 	writer.WriteHeader(http.StatusOK)
 }
@@ -137,9 +134,6 @@ func (handler *AuthHandler) HandleRegisterUser(writer http.ResponseWriter, reque
 	http.SetCookie(writer, c)
 
 	handler.Logger.Debug("user successful registered by request", zap.String("user login", createdUser.Login))
-
-	ctx := request.Context()
-	request = request.WithContext(context.WithValue(ctx, AuthorizeUserContext, createdUser))
 
 	writer.WriteHeader(http.StatusOK)
 }

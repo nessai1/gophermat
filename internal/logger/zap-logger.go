@@ -39,5 +39,5 @@ func getZapLogLevelByEnvLevel(envType config.EnvType) (zapcore.Level, error) {
 		return zapcore.DebugLevel, nil
 	}
 
-	return 0, fmt.Errorf("unexpected EnvType got (%d)", envType)
+	return 0, fmt.Errorf("unexpected EnvType got (%s)", envType)
 }
