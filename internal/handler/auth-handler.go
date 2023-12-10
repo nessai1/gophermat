@@ -34,8 +34,16 @@ type userJWTClaims struct {
 
 type AuthHandler struct {
 	Logger         *zap.Logger
-	SecretKey      string
+	secretKey      string
 	UserController *user.Controller
+}
+
+func NewAuthHandler(logger *zap.Logger, secretKey string, userController *user.Controller) *AuthHandler {
+	return &AuthHandler{
+		Logger:         logger,
+		secretKey:      secretKey,
+		UserController: userController,
+	}
 }
 
 func (handler *AuthHandler) HandleAuthUser(writer http.ResponseWriter, request *http.Request) {
@@ -63,11 +71,13 @@ func (handler *AuthHandler) HandleAuthUser(writer http.ResponseWriter, request *
 	}
 
 	fetchedUser, err := handler.UserController.GetUserByCredentials(request.Context(), credentials.Login, credentials.Password)
-	if err != nil && (errors.Is(err, user.ErrUserNotFound) || errors.Is(err, user.ErrIncorrectUserPassword)) {
-		handler.Logger.Debug("user send invalid credentials on login")
-		writer.WriteHeader(http.StatusUnauthorized)
-		return
-	} else if err != nil {
+	if err != nil {
+		if errors.Is(err, user.ErrUserNotFound) || errors.Is(err, user.ErrIncorrectUserPassword) {
+			handler.Logger.Debug("user send invalid credentials on login")
+			writer.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
 		handler.Logger.Error("error while get user on login", zap.Error(err))
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
@@ -113,11 +123,13 @@ func (handler *AuthHandler) HandleRegisterUser(writer http.ResponseWriter, reque
 	}
 
 	createdUser, err := handler.UserController.AddUser(request.Context(), credentials.Login, credentials.Password)
-	if err != nil && errors.Is(err, user.ErrLoginAlreadyExists) {
-		handler.Logger.Debug("user try register existing account", zap.String("login", credentials.Login))
-		writer.WriteHeader(http.StatusConflict)
-		return
-	} else if err != nil {
+	if err != nil {
+		if errors.Is(err, user.ErrLoginAlreadyExists) {
+			handler.Logger.Debug("user try register existing account", zap.String("login", credentials.Login))
+			writer.WriteHeader(http.StatusConflict)
+			return
+		}
+
 		handler.Logger.Error("error while create new user by register", zap.Error(err))
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
@@ -142,11 +154,13 @@ func (handler *AuthHandler) MiddlewareAuthorizeRequest() func(handler http.Handl
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			cookie, err := request.Cookie(authCookieName)
-			if err != nil && errors.Is(err, http.ErrNoCookie) {
-				handler.Logger.Debug("user has no auth cookie", zap.String("client address", request.RemoteAddr))
-				writer.WriteHeader(http.StatusUnauthorized)
-				return
-			} else if err != nil {
+			if err != nil {
+				if errors.Is(err, http.ErrNoCookie) {
+					handler.Logger.Debug("user has no auth cookie", zap.String("client address", request.RemoteAddr))
+					writer.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+
 				handler.Logger.Error("undefined error occurred in auth middleware", zap.String("client address", request.RemoteAddr), zap.Error(err))
 				writer.WriteHeader(http.StatusInternalServerError)
 				return
@@ -154,17 +168,19 @@ func (handler *AuthHandler) MiddlewareAuthorizeRequest() func(handler http.Handl
 
 			ctx := request.Context()
 			authUser, err := handler.fetchUser(ctx, cookie.Value)
-			if err != nil && errors.Is(err, ErrWrongSign) {
-				handler.Logger.Debug("user sends invalid sign cookie", zap.Error(err))
-				c := &http.Cookie{
-					Value:  "",
-					Name:   authCookieName,
-					MaxAge: -1,
+			if err != nil {
+				if errors.Is(err, ErrWrongSign) {
+					handler.Logger.Debug("user sends invalid sign cookie", zap.Error(err))
+					c := &http.Cookie{
+						Value:  "",
+						Name:   authCookieName,
+						MaxAge: -1,
+					}
+					http.SetCookie(writer, c)
+					writer.WriteHeader(http.StatusUnauthorized)
+					return
 				}
-				http.SetCookie(writer, c)
-				writer.WriteHeader(http.StatusUnauthorized)
-				return
-			} else if err != nil {
+
 				handler.Logger.Error("error while getting user for auth middleware", zap.Error(err))
 				writer.WriteHeader(http.StatusInternalServerError)
 				return
@@ -182,7 +198,7 @@ func (handler *AuthHandler) MiddlewareAuthorizeRequest() func(handler http.Handl
 func (handler *AuthHandler) fetchUser(ctx context.Context, sign string) (*user.User, error) {
 	claims := &userJWTClaims{}
 	_, err := jwt.ParseWithClaims(sign, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(handler.SecretKey), nil
+		return []byte(handler.secretKey), nil
 	})
 
 	if err != nil {
@@ -207,7 +223,7 @@ func (handler *AuthHandler) createSign(signedUser *user.User) (string, error) {
 		Login: signedUser.Login,
 	})
 
-	tokenString, err := token.SignedString([]byte(handler.SecretKey))
+	tokenString, err := token.SignedString([]byte(handler.secretKey))
 	if err != nil {
 		return "", err
 	}

@@ -30,10 +30,7 @@ func Start() error {
 	}
 
 	userController := user.NewController(user.CreatePGXRepository(db))
-	authHandler := handler.AuthHandler{
-		Logger:         log,
-		UserController: userController,
-	}
+	authHandler := handler.NewAuthHandler(log, cfg.SecretKey, userController)
 
 	router.Use(zip.GetZipMiddleware(log))
 

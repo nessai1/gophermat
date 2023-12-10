@@ -1,6 +1,7 @@
 package order
 
 import (
+	"context"
 	"errors"
 	"strconv"
 )
@@ -10,7 +11,7 @@ var ErrEmptyBalance = errors.New("empty balance")
 
 func IsOrderNumberCorrect(orderNumber string) bool {
 	sum := 0
-
+	context.Background()
 	numSize := len(orderNumber)
 	for i := 0; i < numSize; i++ {
 		num, err := strconv.Atoi(string(orderNumber[numSize-i-1]))
