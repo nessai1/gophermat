@@ -14,6 +14,8 @@ const (
 	EnvTypeProduction  EnvType = "production"
 )
 
+const defaultSecretKey = "default_secret_key"
+
 type Config struct {
 	ServiceAddr        string
 	AccrualServiceAddr string
@@ -55,11 +57,16 @@ func fetchConfig() *Config {
 		envType = EnvType(envTypeStr)
 	}
 
+	secretKey := os.Getenv("ACCRUAL_SYSTEM_ADDRESS")
+	if secretKey == "" {
+		secretKey = defaultSecretKey
+	}
+
 	return &Config{
 		ServiceAddr:        *serviceAddr,
 		AccrualServiceAddr: *accrualServiceAddr,
 		DBConnectionStr:    *databaseConnection,
-		SecretKey:          os.Getenv("ACCRUAL_SYSTEM_ADDRESS"),
+		SecretKey:          secretKey,
 		EnvType:            envType,
 	}
 }
